@@ -1,0 +1,328 @@
+package com.qagate.gandhara;
+
+import android.Manifest;
+import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.support.v4.app.ActivityCompat;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.BaseAdapter;
+import android.widget.Toast;
+
+import com.yalantis.euclid.library.EuclidActivity;
+import com.yalantis.euclid.library.EuclidListAdapter;
+import com.yalantis.euclid.library.Memberdetails;
+
+import java.util.ArrayList;
+
+public class ContactActivity extends EuclidActivity {
+    FactoryClass mFactory;
+    Handler mHandler;
+    Context mContext;
+    ArrayList<Memberdetails> mMemberList;
+    Memberdetails member;
+    byte[] byteArray;
+    Bitmap bmp;
+    int isCreated = 0;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        Uri intentUri = getIntent().getData();
+        if (intentUri != null) {
+            String scheme = intentUri.getScheme();
+            String host = intentUri.getHost();
+            int port = intentUri.getPort();
+        } else {
+
+        }
+
+
+        mContext = this;
+        mProgressbar.setVisibility(View.VISIBLE);
+        mListView.setTextFilterEnabled(true);
+
+        mAddFAB.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                isCreated = 1;
+                showEditScreen();
+                edited = true;
+                mTextEdit.setText(getResources().getString(R.string.save));
+                imgCallbutton.setBackground(getResources().getDrawable(R.drawable.camera));
+                showedittextviews();
+            }
+        });
+        mButtonProfile.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (edited) {
+                    Intent intent = new Intent(ContactActivity.this, CroperActivity.class);
+                    startActivityForResult(intent, 90);
+                } else {
+                    if (mobile == null || mobile.length() < 9) {
+                        Toast.makeText(mContext, getResources().getString(R.string.invalidnumber), Toast.LENGTH_SHORT).show();
+                    } else {
+                        Intent callIntent = new Intent(Intent.ACTION_CALL);
+                        callIntent.setData(Uri.parse("tel:" + mobile));
+                        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+                            // TODO: Consider calling
+                            //    ActivityCompat#requestPermissions
+                            // here to request the missing permissions, and then overriding
+                            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+                            //                                          int[] grantResults)
+                            // to handle the case where the user grants the permission. See the documentation
+                            // for ActivityCompat#requestPermissions for more details.
+                            return;
+                        }
+                        startActivity(callIntent);
+                    }
+                }
+            }
+        });
+        mTextEdit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(edited)
+                {
+                    edited = false;
+                    mTextEdit.setText(getResources().getString(R.string.edit));
+                    imgCallbutton.setBackground(getResources().getDrawable(R.drawable.call_white));
+                    mProgressbar.setVisibility(View.VISIBLE);
+                    InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(
+                            ContactActivity.this
+                                    .getCurrentFocus().getWindowToken(),
+                            0);
+                    getDetails();
+                    setDetails();
+                    showtextviews();
+                    if(isCreated == 0)
+                        updateContacts();
+                    else
+                        createContacts();
+                }
+                else
+                {
+                    edited = true;
+                    mTextEdit.setText(getResources().getString(R.string.save));
+                    imgCallbutton.setBackground(getResources().getDrawable(R.drawable.camera));
+                    showedittextviews();
+                }
+            }
+        });
+        mBack.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                edited = false;
+                isCreated = 0;
+                mTextEdit.setText(getResources().getString(com.yalantis.euclid.library.R.string.edit));
+                imgCallbutton.setBackground(getResources().getDrawable(R.drawable.call_white));
+                showtextviews();
+                mListView.setVisibility(View.VISIBLE);
+                animateCloseProfileDetails();
+                loadContacts();
+            }
+        });
+        mHandler = new Handler(new android.os.Handler.Callback() {
+            @Override
+            public boolean handleMessage(Message msg) {
+                if (msg.what == 0) {
+                    initList();
+                    mProgressbar.setVisibility(View.GONE);
+                    /** moving scrollview to down to display the header*/
+                    mScrollview.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            mScrollview.fullScroll(View.FOCUS_UP);
+                        }
+                    });
+                }
+                else if (msg.what == 1) {
+                    mProgressbar.setVisibility(View.GONE);
+                    Toast.makeText(mContext,"Updated..!!", Toast.LENGTH_SHORT).show();
+                }
+                else if (msg.what == 2) {
+                    mProgressbar.setVisibility(View.GONE);
+                    Toast.makeText(mContext,"New Contact created..!!", Toast.LENGTH_SHORT).show();
+                    isCreated = 0;
+                }
+                else if (msg.what == 99) {
+                    mProgressbar.setVisibility(View.GONE);
+                    Toast.makeText(mContext,getResources().getString(R.string.checkconnection), Toast.LENGTH_SHORT).show();
+                }
+                return false;
+            }
+        });
+    }
+
+    private void getDetails()
+    {
+        member = new Memberdetails();
+        member.Name = mEditName.getText().toString();
+        member.Address= mEditAddress.getText().toString();
+        member.Roll_No = mEditRollno.getText().toString();
+        member.Mob_Num = mEditMobile.getText().toString();
+        member.Present_Location = mEditLocation.getText().toString();
+        member.Occupation = mEditOccupation.getText().toString();
+        member.Company_Designation = mEditDesignation.getText().toString();
+        member.E_Mail_ID = mEditEmail.getText().toString();
+        member.Image_path = member.Roll_No+".jpg";
+        member.Status_msg = "Hai i am here...!!";
+
+    }
+    private void setDetails()
+    {
+        mTextViewProfileName.setText(mEditName.getText().toString());
+        mTextViewAddress.setText(mEditAddress.getText().toString());
+        mTextViewRollno.setText(mEditRollno.getText().toString());
+        mTextViewMobile.setText(mEditMobile.getText().toString());
+        mTextViewLocation.setText(mEditLocation.getText().toString());
+        mTextViewProfileDescription.setText(mEditDesignation.getText().toString() + " " + mEditOccupation.getText().toString());
+        mTextViewEmail.setText( mEditEmail.getText().toString());
+
+
+    }
+    private void showtextviews()
+    {
+        mTextViewProfileName.setVisibility(View.VISIBLE);
+        mTextViewProfileDescription.setVisibility(View.VISIBLE);
+        mTextViewRollno.setVisibility(View.VISIBLE);
+        mTextViewMobile.setVisibility(View.VISIBLE);
+        mTextViewEmail.setVisibility(View.VISIBLE);
+        mTextViewLocation.setVisibility(View.VISIBLE);
+        mTextViewAddress.setVisibility(View.VISIBLE);
+
+        mEditName.setVisibility(View.GONE);
+        mEditOccupation.setVisibility(View.GONE);
+        mEditRollno.setVisibility(View.GONE);
+        mEditMobile.setVisibility(View.GONE);
+        mEditEmail.setVisibility(View.GONE);
+        mEditLocation.setVisibility(View.GONE);
+        mEditAddress.setVisibility(View.GONE);
+        mEditDesignation.setVisibility(View.GONE);
+    }
+    private void showedittextviews()
+    {
+        mTextViewProfileName.setVisibility(View.GONE);
+        mTextViewProfileDescription.setVisibility(View.GONE);
+        mTextViewRollno.setVisibility(View.GONE);
+        mTextViewMobile.setVisibility(View.GONE);
+        mTextViewEmail.setVisibility(View.GONE);
+        mTextViewLocation.setVisibility(View.GONE);
+        mTextViewAddress.setVisibility(View.GONE);
+
+        mEditName.setVisibility(View.VISIBLE);
+        mEditOccupation.setVisibility(View.VISIBLE);
+        mEditRollno.setVisibility(View.VISIBLE);
+        mEditMobile.setVisibility(View.VISIBLE);
+        mEditEmail.setVisibility(View.VISIBLE);
+        mEditLocation.setVisibility(View.VISIBLE);
+        mEditAddress.setVisibility(View.VISIBLE);
+        mEditDesignation.setVisibility(View.VISIBLE);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        mFactory = FactoryClass.getInstatnce();
+        isCreated = 0;
+        loadContacts();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        switch(requestCode) {
+            case 90:
+                if (resultCode == RESULT_CANCELED) {
+
+
+                }
+                break;
+        }
+    }
+    private void updateContacts()
+    {
+        Thread th = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    int status = mFactory.updateContactDetails(member);
+                    if (status == 1) {
+                        mHandler.sendEmptyMessage(1);
+                    }
+                    else
+                        mHandler.sendEmptyMessage(99);
+                } catch (Exception ae) {
+                    mHandler.sendEmptyMessage(99);
+                }
+            }
+        });
+        th.start();
+    }
+    private void loadContacts() {
+        Thread th = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    mMemberList = mFactory.getContactdetails();
+                    if (mMemberList != null) {
+                        mHandler.sendEmptyMessage(0);
+                    }
+                    else
+                        mHandler.sendEmptyMessage(99);
+                } catch (Exception ae) {
+                    mHandler.sendEmptyMessage(99);
+                }
+            }
+        });
+        th.start();
+    }
+    private void createContacts() {
+        Thread th = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    int status = mFactory.createContact(member);
+                    if (status == 1) {
+                        mHandler.sendEmptyMessage(2);
+                    }
+                    else
+                        mHandler.sendEmptyMessage(99);
+                } catch (Exception ae) {
+                    mHandler.sendEmptyMessage(99);
+                }
+            }
+        });
+        th.start();
+    }
+    @Override
+    protected BaseAdapter getAdapter() {
+        if (isEdited) {
+            ArrayList<Memberdetails> mSearchList = new ArrayList<Memberdetails>();
+            String searchString=mEditText.getText().toString();
+            int textLength=searchString.length();
+            for(int i=0;i < mMemberList.size();i++)
+            {
+                String memberName=mMemberList.get(i).Name;
+                if(textLength <= memberName.length()) {
+                    if(searchString.equalsIgnoreCase(memberName.substring(0,textLength)))
+                    mSearchList.add(mMemberList.get(i));
+                }
+            }
+            return new EuclidListAdapter(this, R.layout.list_item, mSearchList);
+        }
+        else
+            return new EuclidListAdapter(this, R.layout.list_item, mMemberList);
+    }
+
+}
+

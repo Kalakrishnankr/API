@@ -1,0 +1,208 @@
+package com.qagate.gandhara;
+
+import com.yalantis.euclid.library.Memberdetails;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+
+/**
+ * Created by sabodhbs on 12/10/15.
+ */
+public class FactoryClass {
+
+    String url = "http://www.qagate.com/api";
+    public 		int 		HTTP_TIMEOUT 		= 30 * 1000;
+    public 		int 		HTTP_TIMEOUT_WIRELESS = 60 * 1000;
+    FactoryClass mfactory;
+    public static String RollNumber;
+    ArrayList<Memberdetails> mMemberList = new ArrayList<Memberdetails>();
+    public FactoryClass() {
+
+    }
+    public static FactoryClass getInstatnce()
+    {
+        return new FactoryClass();
+    }
+    public ArrayList<Memberdetails> getContactdetails()
+    {
+        mfactory =getInstatnce();
+        String httpUrl = url+"/selectContacts.php";
+        mMemberList =mfactory.executeRequest(httpUrl);
+        return mMemberList;
+    }
+    public int updateContactDetails(Memberdetails member)
+    {
+        JSONObject json = moveToJson(member);
+        String httpUrl = url+"/updation.php";
+        int status =mfactory.executeUpdate(json,httpUrl);
+        return  status;
+    }
+    public int createContact(Memberdetails member)
+    {
+        JSONObject json = moveToJson(member);
+        String httpUrl = url+"/createContact.php";
+        int status =mfactory.executeUpdate(json,httpUrl);
+        return  status;
+    }
+    public int uploadAvatar(JSONObject json)
+    {
+        String httpUrl = url+"/fileupload.php";
+        mfactory =getInstatnce();
+        int status =mfactory.executeUpdate(json,httpUrl);
+        return  status;
+    }
+    private JSONObject moveToJson(Memberdetails member)
+    {
+        JSONObject json=new JSONObject();
+        try {
+            json.put("Roll_No",member.Roll_No);
+            json.put("Name",member.Name);
+            json.put("Address",member.Address);
+            json.put("Mob_Num", member.Mob_Num);
+            json.put("Present_Location", member.Present_Location);
+            json.put("Occupation", member.Occupation);
+            json.put("Company_Designation",member.Company_Designation);
+            json.put("E_Mail_ID", member.E_Mail_ID);
+            json.put("status", member.Status_msg);
+            json.put("image_path", member.Image_path);
+        }
+        catch (Exception ae)
+        {
+
+        }
+        return  json;
+    }
+    private ArrayList<Memberdetails> executeRequest(String httpUrls) {
+        HttpURLConnection conn = null;
+        int statusCode = 0;
+        InputStream in = null;
+        String ResponseMessage = "";
+        ArrayList<Memberdetails> sampleList = null;
+        try {
+            url = httpUrls;
+            URL httpurl = new URL(url);
+            conn = (HttpURLConnection) httpurl.openConnection();
+            conn.setReadTimeout(HTTP_TIMEOUT /*milliseconds*/);
+            conn.setConnectTimeout(HTTP_TIMEOUT /* milliseconds */);
+            System.setProperty("http.keepAlive", "false");
+            conn.setRequestMethod("GET");
+            conn.setDoInput(true);
+            conn.setDoOutput(false);
+            conn.connect();
+            statusCode = conn.getResponseCode();
+            ResponseMessage = conn.getResponseMessage();
+            if (statusCode == 200 || statusCode == 201) {
+                in = new BufferedInputStream(conn.getInputStream());
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+                String json = reader.readLine();
+                if (json != null) {
+                    sampleList = parseJson(json);
+                }
+            }
+        } catch (Exception ae) {
+            ae.printStackTrace();
+        }
+        return  sampleList;
+    }
+    private int executeUpdate(JSONObject json, String httpUrls) {
+        HttpURLConnection conn = null;
+        OutputStream os = null;
+        int statusCode = 0;
+        InputStream in = null;
+        String ResponseMessage = "";
+        String message=json.toString();
+        try {
+            url= httpUrls;
+            URL httpurl = new URL(url);
+            conn = (HttpURLConnection) httpurl.openConnection();
+            conn.setReadTimeout(HTTP_TIMEOUT /*milliseconds*/);
+            conn.setConnectTimeout(HTTP_TIMEOUT /* milliseconds */);
+            System.setProperty("http.keepAlive", "false");
+            conn.setRequestMethod("POST");
+            conn.setFixedLengthStreamingMode(message.getBytes().length);
+            //make some HTTP header nicety
+            conn.setRequestProperty("Content-Type", "application/json;charset=utf-8");
+            //open
+            conn.connect();
+            //setup send
+            os = new BufferedOutputStream(conn.getOutputStream());
+            os.write(message.getBytes());
+            //clean up
+            os.flush();
+            statusCode = conn.getResponseCode();
+            ResponseMessage = conn.getResponseMessage();
+            if (statusCode == 200 || statusCode == 201) {
+                in = new BufferedInputStream(conn.getInputStream());
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+                ResponseMessage = reader.readLine();
+                if (ResponseMessage != null) {
+                    statusCode = 1;
+                    System.out.print(json.toString());
+
+                }
+            }
+        } catch (Exception ae) {
+            ae.printStackTrace();
+        }
+        return  statusCode;
+    }
+
+    private ArrayList<Memberdetails> parseJson(String json) {
+        ArrayList<Memberdetails> sample = new ArrayList<Memberdetails>();
+        try {
+
+            JSONObject jsonobj = new JSONObject(json);
+            JSONArray jsonArray = jsonobj.getJSONArray("members");
+            for (int i = 0; i < jsonArray.length(); i++) {
+                Memberdetails member = new Memberdetails();
+                member.Name = jsonArray.getJSONObject(i).optString("Name", "");
+                member.Address= jsonArray.getJSONObject(i).optString("Address", "");
+                member.Sr_No = jsonArray.getJSONObject(i).optString("Sr_No", "");
+                member.Roll_No = jsonArray.getJSONObject(i).getString("Roll_No");
+                member.Mob_Num = jsonArray.getJSONObject(i).optString("Mob_Num", "");
+                member.Present_Location = jsonArray.getJSONObject(i).optString("Present_Location", "");
+                member.Occupation = jsonArray.getJSONObject(i).optString("Occupation", "");
+                member.Company_Designation = jsonArray.getJSONObject(i).optString("Company_Designation", "");
+                member.E_Mail_ID = jsonArray.getJSONObject(i).optString("E_Mail_ID", "");
+//                member.Image_path = jsonArray.getJSONObject(i).optString("image_path","");
+//                member.Status_msg = jsonArray.getJSONObject(i).optString("status","");
+                member.Image_path = "http://www.qagate.com/api/images/"+member.Roll_No+".jpg";
+                member.Status_msg = "Hai i am here...!!";
+                sample.add(member);
+            }
+
+        } catch (Exception ae) {
+            ae.printStackTrace();
+
+        }
+        return sample;
+
+    }
+
+    public void sendImages()
+    {
+
+
+
+
+
+
+
+    }
+
+
+
+
+
+}
+
